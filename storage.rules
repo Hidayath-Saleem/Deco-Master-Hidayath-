@@ -1,0 +1,22 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+
+    match /users/{userId}/study-materials/{docId}/{fileName} {
+      allow read: if request.auth != null
+        && request.auth.uid == userId;
+      allow write: if request.auth != null
+        && request.auth.uid == userId
+        && request.auth.token.email_verified == true
+        && userId.matches('^[a-zA-Z0-9_\\-]+$')
+        && docId.matches('^[a-zA-Z0-9_\\-]+$')
+        && request.resource.size <= 35 * 1024 * 1024;
+      allow delete: if request.auth != null
+        && request.auth.uid == userId
+        && request.auth.token.email_verified == true;
+    }
+  }
+}

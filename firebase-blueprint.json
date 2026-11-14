@@ -1,0 +1,186 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Authenticated student profile record isolated per user UID.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "maxLength": 254
+        },
+        "displayName": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "photoURL": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["uid", "email", "createdAt", "updatedAt"]
+    },
+    "StudyDocumentMeta": {
+      "title": "StudyDocumentMeta",
+      "description": "Metadata and Firebase Storage reference for an uploaded or synced DECO study file.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 240
+        },
+        "source": {
+          "type": "string",
+          "enum": ["drive", "upload"]
+        },
+        "driveFileId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "mimeType": {
+          "type": "string",
+          "maxLength": 160
+        },
+        "sizeBytes": {
+          "type": "number"
+        },
+        "pageCount": {
+          "type": "number"
+        },
+        "chunkCount": {
+          "type": "number"
+        },
+        "contentHash": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "unitHint": {
+          "type": "number"
+        },
+        "storagePath": {
+          "type": "string",
+          "maxLength": 400
+        },
+        "storageDownloadUrl": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "uploadedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "ownerId",
+        "name",
+        "source",
+        "mimeType",
+        "sizeBytes",
+        "pageCount",
+        "chunkCount",
+        "contentHash",
+        "uploadedAt",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "UserWorkspace": {
+      "title": "UserWorkspace",
+      "description": "Per-user DECO Master learning progress, settings, syllabus units, attempts, and activity summary.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "settings": {
+          "type": "object",
+          "description": "User preferences including theme, Drive folder URL/ID, and tutor preferences."
+        },
+        "units": {
+          "type": "array",
+          "description": "Five-unit DECO syllabus structure and topic completion statuses."
+        },
+        "quizAttempts": {
+          "type": "array",
+          "description": "Completed practice test attempts."
+        },
+        "mockAttempts": {
+          "type": "array",
+          "description": "Completed mock exam attempts."
+        },
+        "activities": {
+          "type": "array",
+          "description": "Recent student learning activity records."
+        },
+        "lastSyncedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["ownerId", "settings", "units", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Private user profile document keyed by Firebase Auth UID."
+    },
+    "/users/{userId}/documents/{docId}": {
+      "schema": { "$ref": "#/entities/StudyDocumentMeta" },
+      "description": "Metadata and Firebase Storage paths for user study documents."
+    },
+    "/users/{userId}/workspace/{workspaceId}": {
+      "schema": { "$ref": "#/entities/UserWorkspace" },
+      "description": "Persisted DECO syllabus, progress, settings, and assessment history."
+    }
+  }
+}

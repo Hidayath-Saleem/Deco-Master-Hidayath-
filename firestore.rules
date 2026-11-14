@@ -1,0 +1,175 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global safety net: deny all reads and writes unless explicitly matched below
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedOwner(userId) {
+      return isSignedIn()
+        && request.auth.uid == userId
+        && request.auth.token.email_verified == true;
+    }
+
+    function isValidUserProfile(data, userId) {
+      return data.keys().hasAll(['uid', 'email', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'email', 'displayName', 'photoURL', 'createdAt', 'updatedAt'])
+        && data.uid is string && data.uid == request.auth.uid && data.uid == userId && isValidId(data.uid)
+        && data.email is string && data.email.size() >= 3 && data.email.size() <= 254
+        && (!('displayName' in data) || (data.displayName is string && data.displayName.size() <= 120))
+        && (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() <= 500))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidStudyDocumentMeta(data, userId, docId) {
+      return data.keys().hasAll([
+          'id', 'ownerId', 'name', 'source', 'mimeType', 'sizeBytes',
+          'pageCount', 'chunkCount', 'contentHash', 'uploadedAt', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'ownerId', 'name', 'source', 'driveFileId', 'mimeType', 'sizeBytes',
+          'pageCount', 'chunkCount', 'contentHash', 'unitHint', 'storagePath',
+          'storageDownloadUrl', 'uploadedAt', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.id) && data.id == docId
+        && isValidId(data.ownerId) && data.ownerId == request.auth.uid && data.ownerId == userId
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 240
+        && data.source is string && (data.source == 'drive' || data.source == 'upload')
+        && (!('driveFileId' in data) || (data.driveFileId is string && data.driveFileId.size() <= 128))
+        && data.mimeType is string && data.mimeType.size() >= 1 && data.mimeType.size() <= 160
+        && data.sizeBytes is number && data.sizeBytes >= 0 && data.sizeBytes <= 50000000
+        && data.pageCount is number && data.pageCount >= 0 && data.pageCount <= 5000
+        && data.chunkCount is number && data.chunkCount >= 0 && data.chunkCount <= 20000
+        && data.contentHash is string && data.contentHash.size() >= 1 && data.contentHash.size() <= 128
+        && (!('unitHint' in data) || (data.unitHint is number && data.unitHint >= 1 && data.unitHint <= 5))
+        && (!('storagePath' in data) || (data.storagePath is string && data.storagePath.size() <= 400))
+        && (!('storageDownloadUrl' in data) || (data.storageDownloadUrl is string && data.storageDownloadUrl.size() <= 1000))
+        && data.uploadedAt is string && data.uploadedAt.size() >= 1 && data.uploadedAt.size() <= 64
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidWorkspaceSettings(s) {
+      return s is map
+        && s.keys().hasOnly([
+          'theme', 'studentName', 'collegeName', 'driveFolderUrl',
+          'driveFolderId', 'tutorDetailLevel', 'preferCollegeNotesOnly'
+        ])
+        && (!('theme' in s) || (s.theme is string && (s.theme == 'dark' || s.theme == 'light') && s.theme.size() <= 16))
+        && (!('studentName' in s) || (s.studentName is string && s.studentName.size() <= 120))
+        && (!('collegeName' in s) || (s.collegeName is string && s.collegeName.size() <= 160))
+        && (!('driveFolderUrl' in s) || (s.driveFolderUrl is string && s.driveFolderUrl.size() <= 500))
+        && (!('driveFolderId' in s) || (s.driveFolderId is string && s.driveFolderId.size() <= 128))
+        && (!('tutorDetailLevel' in s) || (s.tutorDetailLevel is string && s.tutorDetailLevel.size() <= 32))
+        && (!('preferCollegeNotesOnly' in s) || s.preferCollegeNotesOnly is bool);
+    }
+
+    function isValidUserWorkspace(data, userId) {
+      return data.keys().hasAll(['ownerId', 'settings', 'units', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly([
+          'ownerId', 'settings', 'units', 'quizAttempts', 'mockAttempts',
+          'activities', 'lastSyncedAt', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.ownerId) && data.ownerId == request.auth.uid && data.ownerId == userId
+        && isValidWorkspaceSettings(data.settings)
+        && data.units is list && data.units.size() <= 5
+        && (data.units.size() == 0 || data.units[0] is map)
+        && (!('quizAttempts' in data) || (data.quizAttempts is list && data.quizAttempts.size() <= 100 && (data.quizAttempts.size() == 0 || data.quizAttempts[0] is map)))
+        && (!('mockAttempts' in data) || (data.mockAttempts is list && data.mockAttempts.size() <= 50 && (data.mockAttempts.size() == 0 || data.mockAttempts[0] is map)))
+        && (!('activities' in data) || (data.activities is list && data.activities.size() <= 60 && (data.activities.size() == 0 || data.activities[0] is map)))
+        && (!('lastSyncedAt' in data) || (data.lastSyncedAt is string && data.lastSyncedAt.size() <= 64))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    match /users/{userId} {
+      allow get: if isValidId(userId) && isSignedIn() && request.auth.uid == userId;
+      allow list: if isSignedIn() && resource.data.uid == request.auth.uid;
+      allow create: if isValidId(userId)
+        && isVerifiedOwner(userId)
+        && isValidUserProfile(incoming(), userId)
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(userId)
+        && isVerifiedOwner(userId)
+        && isValidUserProfile(incoming(), userId)
+        && incoming().uid == existing().uid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['email', 'displayName', 'photoURL', 'updatedAt']);
+      allow delete: if false;
+
+      match /documents/{docId} {
+        allow get: if isValidId(userId) && isValidId(docId) && isSignedIn() && request.auth.uid == userId;
+        allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+        allow create: if isValidId(userId) && isValidId(docId)
+          && isVerifiedOwner(userId)
+          && isValidStudyDocumentMeta(incoming(), userId, docId)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && exists(/databases/$(database)/documents/users/$(userId));
+        allow update: if isValidId(userId) && isValidId(docId)
+          && isVerifiedOwner(userId)
+          && isValidStudyDocumentMeta(incoming(), userId, docId)
+          && incoming().ownerId == existing().ownerId
+          && incoming().id == existing().id
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly([
+            'unitHint', 'storagePath', 'storageDownloadUrl', 'updatedAt'
+          ])
+          && get(/databases/$(database)/documents/users/$(userId)).data.uid == request.auth.uid;
+        allow delete: if isValidId(userId) && isValidId(docId)
+          && isVerifiedOwner(userId)
+          && get(/databases/$(database)/documents/users/$(userId)).data.uid == request.auth.uid;
+      }
+
+      match /workspace/{workspaceId} {
+        allow get: if isValidId(userId) && isValidId(workspaceId) && isSignedIn() && request.auth.uid == userId;
+        allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+        allow create: if isValidId(userId) && isValidId(workspaceId)
+          && isVerifiedOwner(userId)
+          && isValidUserWorkspace(incoming(), userId)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && exists(/databases/$(database)/documents/users/$(userId));
+        allow update: if isValidId(userId) && isValidId(workspaceId)
+          && isVerifiedOwner(userId)
+          && isValidUserWorkspace(incoming(), userId)
+          && incoming().ownerId == existing().ownerId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && (
+            incoming().diff(existing()).affectedKeys().hasOnly(['settings', 'updatedAt']) ||
+            incoming().diff(existing()).affectedKeys().hasOnly(['units', 'activities', 'updatedAt']) ||
+            incoming().diff(existing()).affectedKeys().hasOnly(['units', 'lastSyncedAt', 'updatedAt']) ||
+            incoming().diff(existing()).affectedKeys().hasOnly(['quizAttempts', 'activities', 'updatedAt']) ||
+            incoming().diff(existing()).affectedKeys().hasOnly(['mockAttempts', 'activities', 'updatedAt']) ||
+            incoming().diff(existing()).affectedKeys().hasOnly(['settings', 'units', 'quizAttempts', 'mockAttempts', 'activities', 'lastSyncedAt', 'updatedAt'])
+          )
+          && get(/databases/$(database)/documents/users/$(userId)).data.uid == request.auth.uid;
+        allow delete: if isValidId(userId) && isValidId(workspaceId)
+          && isVerifiedOwner(userId)
+          && get(/databases/$(database)/documents/users/$(userId)).data.uid == request.auth.uid;
+      }
+    }
+  }
+}
